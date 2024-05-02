@@ -3,6 +3,7 @@ from port.api.commands import (CommandSystemDonate, CommandSystemExit, CommandUI
 
 import pandas as pd
 import zipfile
+import json
 
 
 def process(sessionId):
@@ -20,7 +21,7 @@ def process(sessionId):
         fileResult = yield render_donation_page(promptFile)
         if fileResult.__type__ == 'PayloadString':
             meta_data.append(("debug", f"{key}: extracting file"))
-            extractionResult = doSomethingWithTheFile(fileResult.value)
+            extractionResult = extract_instagram_posts(fileResult.value)
             if extractionResult != 'invalid':
                 meta_data.append(("debug", f"{key}: extraction successful, go to consent form"))
                 data = extractionResult
@@ -49,7 +50,7 @@ def process(sessionId):
 
 def render_donation_page(body):
     header = props.PropsUIHeader(props.Translatable({
-        "en": "Port flow example",
+        "en": "Instagram flow",
         "nl": "Port voorbeeld flow"
     }))
 
@@ -75,26 +76,28 @@ def retry_confirmation():
 
 def prompt_file(extensions):
     description = props.Translatable({
-        "en": "Please select any zip file stored on your device.",
-        "nl": "Selecteer een willekeurige zip file die u heeft opgeslagen op uw apparaat."
+        "en": "Please select an Instagram zip file stored on your device.",
+        "nl": "Selecteer een Instagram zip file die u heeft opgeslagen op uw apparaat."
     })
 
     return props.PropsUIPromptFileInput(description, extensions)
 
 
-def doSomethingWithTheFile(filename):
-    return extract_zip_contents(filename)
+def extract_instagram_posts(filename):
+    data = extract_content_from_zip(filename, 'media.json')
+    if data and (data != 'invalid'):
+        posts = [(len(data.get('stories', [])), len(data.get('photos', [])))]
+        return posts
+    else:
+        return data
 
 
-def extract_zip_contents(filename):
-    names = []
+def extract_content_from_zip(filename, fn_content):
     try:
-        file = zipfile.ZipFile(filename)
-        data = []
-        for name in file.namelist():
-            names.append(name)
-            info = file.getinfo(name)
-            data.append((name, info.compress_size, info.file_size))
+        data = None
+        with zipfile.ZipFile(filename) as zf:
+            with zf.open(fn_content) as cf:
+                data = json.loads(cf.read())
         return data
     except zipfile.error:
         return "invalid"
@@ -103,8 +106,8 @@ def extract_zip_contents(filename):
 def prompt_consent(data, meta_data):
 
     table_title = props.Translatable({
-        "en": "Zip file contents",
-        "nl": "Inhoud zip bestand"
+        "en": "Number of posts on Instagram",
+        "nl": "Aantal posts op Instagram"
     })
 
     log_title = props.Translatable({
@@ -112,11 +115,9 @@ def prompt_consent(data, meta_data):
         "nl": "Log berichten"
     })
 
-    data_frame = pd.DataFrame(data, columns=["filename", "compressed size", "size"])
+    data_frame = pd.DataFrame(data, columns=["Stories", "Photos"])
     table = props.PropsUIPromptConsentFormTable("zip_content", table_title, data_frame)
-    meta_frame = pd.DataFrame(meta_data, columns=["type", "message"])
-    meta_table = props.PropsUIPromptConsentFormTable("log_messages", log_title, meta_frame)
-    return props.PropsUIPromptConsentForm([table], [meta_table])
+    return props.PropsUIPromptConsentForm([table], [])
 
 
 def donate(key, json_string):

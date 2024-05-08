@@ -7,51 +7,40 @@ import json
 
 
 def process(sessionId):
+    
     yield donate(f"{sessionId}-tracking", '[{ "message": "user entered script" }]')
-
-    key = "zip-contents-example"
-    meta_data = []
-    meta_data.append(("debug", f"{key}: start"))
 
     # STEP 1: select the file
     data = None
     while True:
-        meta_data.append(("debug", f"{key}: prompt file"))
         promptFile = prompt_file("application/zip, text/plain")
         fileResult = yield render_donation_page(promptFile)
         if fileResult.__type__ == 'PayloadString':
-            meta_data.append(("debug", f"{key}: extracting file"))
             extractionResult = extract_instagram_posts(fileResult.value)
             if extractionResult != 'invalid':
-                meta_data.append(("debug", f"{key}: extraction successful, go to consent form"))
                 data = extractionResult
                 break
             else:
-                meta_data.append(("debug", f"{key}: prompt confirmation to retry file selection"))
                 retry_result = yield render_donation_page(retry_confirmation())
                 if retry_result.__type__ == 'PayloadTrue':
-                    meta_data.append(("debug", f"{key}: skip due to invalid file"))
                     continue
                 else:
-                    meta_data.append(("debug", f"{key}: retry prompt file"))
                     break
 
     # STEP 2: ask for consent
     if data is not None:
-        meta_data.append(("debug", f"{key}: prompt consent"))
-        prompt = prompt_consent(data, meta_data)
+        prompt = prompt_consent(data)
         consent_result = yield render_donation_page(prompt)
         if consent_result.__type__ == "PayloadJSON":
-            meta_data.append(("debug", f"{key}: donate consent data"))
-            yield donate(f"{sessionId}-{key}", consent_result.value)
+            yield donate(f"{sessionId}", consent_result.value)
 
-    yield exit(0, "Success")
+    yield exit()
 
 
 def render_donation_page(body):
     header = props.PropsUIHeader(props.Translatable({
-        "en": "Instagram flow",
-        "nl": "Port voorbeeld flow"
+        "en": "Instagram data donation",
+        "nl": "Instagram data donatie"
     }))
 
     page = props.PropsUIPageDonation("Zip", header, body, None)
@@ -103,16 +92,11 @@ def extract_content_from_zip(filename, fn_content):
         return "invalid"
 
 
-def prompt_consent(data, meta_data):
+def prompt_consent(data):
 
     table_title = props.Translatable({
         "en": "Number of posts on Instagram",
         "nl": "Aantal posts op Instagram"
-    })
-
-    log_title = props.Translatable({
-        "en": "Log messages",
-        "nl": "Log berichten"
     })
 
     data_frame = pd.DataFrame(data, columns=["Stories", "Photos"])
@@ -124,5 +108,6 @@ def donate(key, json_string):
     return CommandSystemDonate(key, json_string)
 
 
-def exit(code, info):
-    return CommandSystemExit(code, info)
+def exit():
+    page = props.PropsUIPageEnd()
+    return CommandUIRender(page)

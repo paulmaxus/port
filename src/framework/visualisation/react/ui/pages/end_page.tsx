@@ -16,7 +16,7 @@ export const EndPage = (props: Props): JSX.Element => {
 
   const footer: JSX.Element = <Footer />
 
-  const sidebar: JSX.Element = <Sidebar logo={LogoSvg} />
+  //const sidebar: JSX.Element = <Sidebar logo={LogoSvg} />
 
   const body: JSX.Element = (
     <>
@@ -28,7 +28,7 @@ export const EndPage = (props: Props): JSX.Element => {
   return (
     <Page
       body={body}
-      sidebar={sidebar}
+      //sidebar={sidebar}
       footer={footer}
     />
   )

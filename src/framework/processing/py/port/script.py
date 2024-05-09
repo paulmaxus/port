@@ -75,7 +75,7 @@ def prompt_file(extensions):
 def extract_instagram_posts(filename):
     data = extract_content_from_zip(filename, 'media.json')
     if data and (data != 'invalid'):
-        posts = [(len(data.get('stories', [])), len(data.get('photos', [])))]
+        posts = [(k,len(l)) for k,l in data.items()]
         return posts
     else:
         return data
@@ -99,7 +99,7 @@ def prompt_consent(data):
         "nl": "Aantal posts op Instagram"
     })
 
-    data_frame = pd.DataFrame(data, columns=["Stories", "Photos"])
+    data_frame = pd.DataFrame(data, columns=["Post-type", "Count"])
     table = props.PropsUIPromptConsentFormTable("zip_content", table_title, data_frame)
     return props.PropsUIPromptConsentForm([table], [])
 

@@ -27,7 +27,7 @@ export const TableContainer = ({
   const [search, setSearch] = useState<string>('')
   const lastSearch = useRef<string>('')
   const text = useMemo(() => getTranslations(locale), [locale])
-  const [show, setShow] = useState<boolean>(false)
+  const [show, setShow] = useState<boolean>(true)
 
   useEffect(() => {
     const timer = setTimeout(() => {

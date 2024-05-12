@@ -6,34 +6,32 @@ import zipfile
 import json
 
 
-def process(sessionId):
-    
-    yield donate(f"{sessionId}-tracking", '[{ "message": "user entered script" }]')
-
-    # STEP 1: select the file
+def process(session_id):
     data = None
     while True:
-        promptFile = prompt_file("application/zip, text/plain")
-        fileResult = yield render_donation_page(promptFile)
-        if fileResult.__type__ == 'PayloadString':
-            extractionResult = extract_instagram_posts(fileResult.value)
-            if extractionResult != 'invalid':
-                data = extractionResult
+	# require participant to provide instagram zip file
+        zip_file_prompt = prompt_file("application/zip")
+        zip_file_result = yield render_donation_page(zip_file_prompt)
+        if zip_file_result.__type__ == 'PayloadString':
+            # unzip and extract data
+            extraction_result = extract_instagram_posts(zip_file_result.value)
+            if extraction_result != 'invalid':
+                data = extraction_result
                 break
             else:
+		# let participant choose to retry upon failure
                 retry_result = yield render_donation_page(retry_confirmation())
                 if retry_result.__type__ == 'PayloadTrue':
                     continue
                 else:
                     break
-
-    # STEP 2: ask for consent
+    # ask for consent to donate extracted data
     if data is not None:
-        prompt = prompt_consent(data)
-        consent_result = yield render_donation_page(prompt)
+        consent_prompt = prompt_consent(data)
+        consent_result = yield render_donation_page(consent_prompt)
         if consent_result.__type__ == "PayloadJSON":
-            yield donate(f"{sessionId}", consent_result.value)
-
+            yield donate(f"{session_id}", consent_result.value)
+    # show final page
     yield exit()
 
 
@@ -42,15 +40,14 @@ def render_donation_page(body):
         "en": "Instagram data donation",
         "nl": "Instagram data donatie"
     }))
-
     page = props.PropsUIPageDonation("Zip", header, body, None)
     return CommandUIRender(page)
 
 
 def retry_confirmation():
     text = props.Translatable({
-        "en": "Unfortunately, we cannot process your file. Continue, if you are sure that you selected the right file. Try again to select a different file.",
-        "nl": "Helaas, kunnen we uw bestand niet verwerken. Weet u zeker dat u het juiste bestand heeft gekozen? Ga dan verder. Probeer opnieuw als u een ander bestand wilt kiezen."
+        "en": "Unfortunately, we cannot process your file. Continue if you are sure that you selected the right file. Try again to select a different file.",
+        "nl": "Helaas kunnen we uw bestand niet verwerken. Weet u zeker dat u het juiste bestand heeft gekozen? Ga dan verder. Probeer opnieuw als u een ander bestand wilt kiezen."
     })
     ok = props.Translatable({
         "en": "Try again",
@@ -73,33 +70,37 @@ def prompt_file(extensions):
 
 
 def extract_instagram_posts(filename):
+    # all post types are listed in media.json: extract and count
     data = extract_content_from_zip(filename, 'media.json')
     if data and (data != 'invalid'):
-        posts = [(k,len(l)) for k,l in data.items()]
+        # exclude profile (=1)
+        posts = [(k,len(l)) for k,l in data.items() if k!='profile']
         return posts
     else:
         return data
 
 
 def extract_content_from_zip(filename, fn_content):
+    # extract (json) data from file in zip
     try:
         data = None
         with zipfile.ZipFile(filename) as zf:
-            with zf.open(fn_content) as cf:
-                data = json.loads(cf.read())
+            try:
+                with zf.open(fn_content) as cf:
+                    data = json.loads(cf.read())
+            except KeyError:
+                pass
         return data
     except zipfile.error:
-        return "invalid"
+        return 'invalid'
 
 
 def prompt_consent(data):
-
     table_title = props.Translatable({
         "en": "Number of posts on Instagram",
         "nl": "Aantal posts op Instagram"
     })
-
-    data_frame = pd.DataFrame(data, columns=["Post-type", "Count"])
+    data_frame = pd.DataFrame(data, columns=["Type", "Count"])
     table = props.PropsUIPromptConsentFormTable("zip_content", table_title, data_frame)
     return props.PropsUIPromptConsentForm([table], [])
 

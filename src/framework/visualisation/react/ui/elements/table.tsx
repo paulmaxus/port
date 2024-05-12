@@ -42,7 +42,7 @@ export const Table = ({
   search,
   handleDelete,
   handleUndo,
-  pageSize = 7
+  pageSize = 2
 }: Props): JSX.Element => {
   const [page, setPage] = useState(0)
   const columnNames = useMemo(() => table.head.cells.map((cell) => cell.text), [table])
